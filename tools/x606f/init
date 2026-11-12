@@ -1,1 +1,30 @@
+#!/bin/busybox sh
+# TB-X606F bring-up 用的最小 init: 不依赖任何 Android 组件
+/bin/busybox mount -t proc proc /proc
+/bin/busybox mount -t sysfs sysfs /sys
+/bin/busybox mount -t devtmpfs devtmpfs /dev 2>/dev/null
 
+say() {
+  echo "$@" > /dev/kmsg 2>/dev/null
+  echo "$@" > /dev/console 2>/dev/null
+  echo "$@" > /dev/tty0 2>/dev/null
+  echo "$@" > /dev/ttyS0 2>/dev/null
+}
+
+say "================================================"
+say " TB-X606F  mainline $(uname -r)  init OK"
+say " cpus: $(grep -c ^processor /proc/cpuinfo)   mem: $(grep MemTotal /proc/meminfo)"
+say "================================================"
+
+# 串口上给一个 shell (如果接了 UART)
+if [ -c /dev/ttyS0 ]; then
+  setsid sh -c 'exec sh </dev/ttyS0 >/dev/ttyS0 2>&1' &
+fi
+
+# 屏幕上每 3 秒打一次心跳, 方便确认内核没挂
+n=0
+while true; do
+  n=$((n+1))
+  say "heartbeat $n   uptime $(cut -d' ' -f1 /proc/uptime)s"
+  sleep 3
+done
