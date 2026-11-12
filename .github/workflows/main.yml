@@ -1,0 +1,80 @@
+name: Download Linux 7.3.4 and Push to Repo
+
+on:
+  # 手动触发
+  workflow_dispatch:
+  # 也可以改成定时，例如每天运行一次
+  # schedule:
+  #   - cron: '0 2 * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  download-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 获取完整历史，方便后续 force push
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Download Linux 7.3.4 tarball
+        run: |
+          echo "Downloading linux-7.3.4.tar.xz ..."
+          wget -q --show-progress -O linux-7.3.4.tar.xz \
+            "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.4.tar.xz"
+
+          echo "Download completed:"
+          ls -lh linux-7.3.4.tar.xz
+
+      - name: Extract source
+        run: |
+          echo "Extracting..."
+          tar -xf linux-7.3.4.tar.xz
+          # 解压后目录名是 linux-7.3.4
+          ls -ld linux-7.3.4
+
+      - name: Prepare repository content
+        run: |
+          # 清空当前仓库内容（保留 .git）
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'linux-7.3.4' -exec rm -rf {} +
+
+          # 把解压出来的源码移动到仓库根目录
+          mv linux-7.3.4/* .
+          mv linux-7.3.4/.[!.]* . 2>/dev/null || true
+          rmdir linux-7.3.4
+
+          # 删除下载的压缩包
+          rm -f linux-7.3.4.tar.xz
+
+          echo "Repository content prepared:"
+          ls -la | head -20
+
+      - name: Commit and push
+        run: |
+          git add -A
+          git status
+
+          # 如果没有变化就跳过
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git commit -m "Add Linux kernel 7.3.4 source
+
+Downloaded from:
+https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.4.tar.xz"
+
+          # 强制推送到当前分支（默认 main）
+          git push --force origin HEAD
