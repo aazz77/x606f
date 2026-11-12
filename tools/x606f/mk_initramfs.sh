@@ -13,7 +13,7 @@ docker rm x606f-bb >/dev/null
 chmod 755 "$W/root/bin/busybox"
 file "$W/root/bin/busybox" 2>/dev/null || true
 
-for a in sh ls cat echo mount umount dmesg sleep cut grep uname setsid ps free df ip; do
+for a in sh ls cat echo mount umount dmesg sleep cut grep uname setsid ps free df ip reboot poweroff; do
   ln -sf busybox "$W/root/bin/$a"
 done
 install -m 755 "$HERE/init" "$W/root/init"

@@ -40,3 +40,13 @@ python3 tools/x606f/x606f_bootpack.py pack -o boot_test.img \
 ## 内核 7.3.4 里已有的 MT6765 支持 (第二阶段可直接用)
 `clk-mt6765*` (topckgen/infracfg/apmixedsys/mm/img/cam/vcodec/audio)、`pinctrl-mt6765`、`mtk-pmic-wrap`(mt6765)、
 `mtk-sd`(借 mt8183 compat)、`mediatek,mt6765-uart`、`mediatek,mt6765-sysirq`。
+
+## 黑屏 / 回到 preloader 的排查 (没有串口时)
+1. **先还原**: 用 mtkclient 或 SP Flash Tool 把采集包里的 `partitions/recovery.img` 刷回 recovery 分区。
+2. 用 `x606f-min.config` (Actions 默认) 编译: Image.gz 只有约 1.6MB, 排除"镜像太大"。
+3. 设备树里已加 `watchdog@10007000`, 内核会代喂 LK 打开的硬件看门狗; 没有它的话内核活着也会被复位, 表现和崩溃一样。
+4. init 默认 **45 秒后自动 reboot** (命令行 `x606f.reboot=秒数` 可改, 0 为不重启)。用秒表观察:
+   - ≈45 秒后自己重启 → 内核已跑到用户态 (只是屏幕没点亮)
+   - 几秒内就重启 → 内核早期挂死/崩溃, 看门狗复位
+   - 一直黑屏不重启 → 内核活着, 但 init 没跑或没喂狗机制生效
+5. 回到安卓后记下 `getprop ro.boot.bootreason`, 与正常开机的 `reboot` 对比。

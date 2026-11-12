@@ -11,9 +11,16 @@ say() {
   echo "$@" > /dev/ttyS0 2>/dev/null
 }
 
+# 命令行参数 x606f.reboot=秒数: 到点后自动重启 (默认 45 秒; 0 = 不重启)
+T=45
+for w in $(cat /proc/cmdline); do
+  case "$w" in x606f.reboot=*) T=${w#x606f.reboot=} ;; esac
+done
+
 say "================================================"
 say " TB-X606F  mainline $(uname -r)  init OK"
-say " cpus: $(grep -c ^processor /proc/cpuinfo)   mem: $(grep MemTotal /proc/meminfo)"
+say " cpus: $(grep -c ^processor /proc/cpuinfo)   $(grep MemTotal /proc/meminfo)"
+say " auto reboot after ${T}s"
 say "================================================"
 
 # 串口上给一个 shell (如果接了 UART)
@@ -21,10 +28,19 @@ if [ -c /dev/ttyS0 ]; then
   setsid sh -c 'exec sh </dev/ttyS0 >/dev/ttyS0 2>&1' &
 fi
 
-# 屏幕上每 3 秒打一次心跳, 方便确认内核没挂
+# 手动喂狗 (若内核驱动已自动代喂也无妨)
+if [ -c /dev/watchdog ]; then
+  ( while true; do echo . > /dev/watchdog; sleep 5; done ) &
+fi
+
 n=0
 while true; do
-  n=$((n+1))
   say "heartbeat $n   uptime $(cut -d' ' -f1 /proc/uptime)s"
   sleep 3
+  n=$((n+3))
+  if [ "$T" -gt 0 ] && [ "$n" -ge "$T" ]; then
+    say "auto reboot now"
+    sleep 1
+    reboot -f
+  fi
 done
