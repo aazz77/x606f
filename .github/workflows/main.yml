@@ -71,10 +71,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Add Linux kernel 7.3.4 source
-
-Downloaded from:
-https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.3.4.tar.xz"
+          git commit -m "Add Linux kernel 7.3.4 source"
 
           # 强制推送到当前分支（默认 main）
           git push --force origin HEAD
