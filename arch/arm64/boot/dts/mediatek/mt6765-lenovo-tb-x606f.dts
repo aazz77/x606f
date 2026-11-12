@@ -141,6 +141,17 @@
 		reg = <0 0x10200a80 0 0x50>;
 	};
 
+	/*
+	 * 顶层复位/看门狗 (toprgu)。LK 已经启动了硬件看门狗, 内核不喂狗会在几十秒内被复位,
+	 * 表现就是"黑屏然后又回到 preloader"。驱动加载后内核会自动代喂, 直到用户态接管。
+	 */
+	watchdog: watchdog@10007000 {
+		compatible = "mediatek,mt6589-wdt";
+		reg = <0 0x10007000 0 0x100>;
+		timeout-sec = <30>;
+		#reset-cells = <1>;
+	};
+
 	/* UART0: LK 已初始化, 921600 8n1 */
 	uart0: serial@11002000 {
 		compatible = "mediatek,mt6765-uart", "mediatek,mt6577-uart";
