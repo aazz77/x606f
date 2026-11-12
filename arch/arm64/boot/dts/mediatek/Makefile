@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+dtb-$(CONFIG_ARCH_MEDIATEK) += mt6765-lenovo-tb-x606f.dtb
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt6779-evb.dtb
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
 dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-sony-xperia-m5.dtb
@@ -188,3 +189,4 @@ DTC_FLAGS_mt7988a-bananapi-bpi-r4-2g5 := -@
 DTC_FLAGS_mt7988a-bananapi-bpi-r4-pro-4e := -@
 DTC_FLAGS_mt7988a-bananapi-bpi-r4-pro-8x := -@
 DTC_FLAGS_mt8395-radxa-nio-12l := -@
+DTC_FLAGS_mt6765-lenovo-tb-x606f := -Wno-unit_address_vs_reg

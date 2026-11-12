@@ -1,0 +1,164 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Lenovo Tab M10 FHD Plus (TB-X606F) - 第一阶段最小设备树 (bring-up)
+ *
+ * 目标: 主线内核能在 LK 之后启动, 通过 UART0 / simple-framebuffer 看到输出,
+ *       用 boot.img 里的 ramdisk 或 initramfs 进入用户态。
+ *
+ * 数据来源: 你采集包里的运行时设备树 + boot.img 内置 DTB + /proc/iomem。
+ * 说明:
+ *  - 这一阶段没有时钟/电源/中断之外的任何 SoC 驱动: 靠 LK 已经点亮的外设工作,
+ *    所以不要加 clk/regulator 的 consumer, 否则会因为缺驱动而 probe 失败。
+ *  - 标记 TODO 的地方是推测值, 需要上板验证。
+ */
+
+/dts-v1/;
+
+/ {
+	model = "Lenovo Tab M10 FHD Plus (TB-X606F)";
+	compatible = "lenovo,tb-x606f", "mediatek,mt6765";
+	interrupt-parent = <&sysirq>;
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		stdout-path = "serial0:921600n8";
+		/* 真正的 bootargs 由 boot.img 的 cmdline 提供 (见 build_boot.sh) */
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* LK 会在运行时往 /chosen 写 atag,videolfb 等属性, 不要删除这个节点 */
+
+		framebuffer0: framebuffer@7dfe0000 {
+			compatible = "simple-framebuffer";
+			reg = <0 0x7dfe0000 0 0x1f20000>;
+			/* 面板: mipi_ft8201_video_1200p, 1200x1920 */
+			width = <1200>;
+			height = <1920>;
+			/*
+			 * TODO: stride 与像素格式需实测。
+			 *  - Android 内核 fb0 的 stride 是 4864 (1216*4), LK 的可能是 4800 (1200*4)
+			 *  - 格式先试 a8r8g8b8, 颜色不对再换 a8b8g8r8
+			 */
+			stride = <4864>;
+			format = "a8r8g8b8";
+		};
+	};
+
+	/*
+	 * 内存: LK 会在启动时改写 /memory 的 reg。这里写的是你设备上 /proc/iomem
+	 * 里实际的 System RAM 区间 (约 3.9 GiB, 4GB 版本), 其中的空洞就是
+	 * ATF / modem / SCP / SSPM / 帧缓冲等固件保留区, 不要合并成一整块!
+	 */
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x40000000 0x0 0x7c80000>,
+		      <0x0 0x47dd0000 0x0 0x28230000>,
+		      <0x0 0x76000000 0x0 0x1ff0000>,
+		      <0x0 0x78000000 0x0 0x5fe0000>,
+		      <0x0 0x7ffc0000 0x0 0xd040000>,
+		      <0x0 0x8d300000 0x0 0xd00000>,
+		      <0x0 0x90000000 0x0 0xf3f0000>,
+		      <0x0 0x9ff00000 0x0 0x1e100000>,
+		      <0x0 0xbe400000 0x0 0xc00000>,
+		      <0x0 0xbf300000 0x0 0xb00000>,
+		      <0x0 0xbfe40000 0x0 0x130000>,
+		      <0x0 0xbfff0000 0x0 0xf000>,
+		      <0x0 0xc0000000 0x0 0x7ffff000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		/* LK 的帧缓冲, 位于上面 System RAM 的空洞里, 这里只是声明用途 */
+		fb_reserved: framebuffer@7dfe0000 {
+			reg = <0 0x7dfe0000 0 0x1f20000>;
+			no-map;
+		};
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu0: cpu@0   { device_type = "cpu"; compatible = "arm,cortex-a53"; reg = <0x000>; enable-method = "psci"; };
+		cpu1: cpu@1   { device_type = "cpu"; compatible = "arm,cortex-a53"; reg = <0x001>; enable-method = "psci"; };
+		cpu2: cpu@2   { device_type = "cpu"; compatible = "arm,cortex-a53"; reg = <0x002>; enable-method = "psci"; };
+		cpu3: cpu@3   { device_type = "cpu"; compatible = "arm,cortex-a53"; reg = <0x003>; enable-method = "psci"; };
+		cpu4: cpu@100 { device_type = "cpu"; compatible = "arm,cortex-a53"; reg = <0x100>; enable-method = "psci"; };
+		cpu5: cpu@101 { device_type = "cpu"; compatible = "arm,cortex-a53"; reg = <0x101>; enable-method = "psci"; };
+		cpu6: cpu@102 { device_type = "cpu"; compatible = "arm,cortex-a53"; reg = <0x102>; enable-method = "psci"; };
+		cpu7: cpu@103 { device_type = "cpu"; compatible = "arm,cortex-a53"; reg = <0x103>; enable-method = "psci"; };
+	};
+
+	psci {
+		compatible = "arm,psci-1.0";
+		method = "smc";
+	};
+
+	timer {
+		compatible = "arm,armv8-timer";
+		/* 厂商树: 13 MHz; 同时保留 clock-frequency 以防固件没设置 CNTFRQ */
+		clock-frequency = <13000000>;
+		interrupt-parent = <&gic>;
+		interrupts = <1 13 8>,
+			     <1 14 8>,
+			     <1 11 8>,
+			     <1 10 8>;
+	};
+
+	clk26m: oscillator-26m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <26000000>;
+		clock-output-names = "clk26m";
+	};
+
+	gic: interrupt-controller@c000000 {
+		compatible = "arm,gic-v3";
+		#interrupt-cells = <3>;
+		interrupt-parent = <&gic>;
+		interrupt-controller;
+		#redistributor-regions = <1>;
+		reg = <0 0x0c000000 0 0x40000>,		/* distributor */
+		      <0 0x0c100000 0 0x200000>;	/* redistributors */
+		interrupts = <1 9 4>;			/* maintenance PPI */
+	};
+
+	/* MediaTek 的极性反转中断控制器, 外设中断都经它转发给 GIC */
+	sysirq: interrupt-controller@10200a80 {
+		compatible = "mediatek,mt6765-sysirq", "mediatek,mt6577-sysirq";
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		interrupt-parent = <&gic>;
+		reg = <0 0x10200a80 0 0x50>;
+	};
+
+	/* UART0: LK 已初始化, 921600 8n1 */
+	uart0: serial@11002000 {
+		compatible = "mediatek,mt6765-uart", "mediatek,mt6577-uart";
+		reg = <0 0x11002000 0 0x1000>;
+		interrupts = <0 91 8>;	/* SPI 91, 经 sysirq 反转极性 */
+		clocks = <&clk26m>, <&clk26m>;	/* 先用固定时钟; 后续换成 topckgen/infracfg 的真时钟 */
+		clock-names = "baud", "bus";
+		status = "okay";
+	};
+
+	/*
+	 * eMMC (msdc0), 0x11230000, SPI 79。
+	 * 需要 topckgen/infracfg 时钟驱动和 PMIC 电源, 第二阶段再启用。
+	 */
+	mmc0: mmc@11230000 {
+		compatible = "mediatek,mt8183-mmc";	/* TODO: mtk-sd 里还没有 mt6765 专用 compat, 先借用 mt8183 */
+		reg = <0 0x11230000 0 0x1000>;
+		interrupts = <0 79 8>;
+		status = "disabled";
+	};
+};
