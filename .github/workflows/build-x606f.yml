@@ -52,7 +52,9 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- mediatek/mt6765-lenovo-tb-x606f.dtb
 
       - name: Build initramfs (static aarch64 busybox)
-        run: tools/x606f/mk_initramfs.sh initramfs.cpio.gz
+        run: |
+          chmod 755 tools/x606f/*
+          tools/x606f/mk_initramfs.sh initramfs.cpio.gz
 
       - name: Pack boot_test.img
         env:
