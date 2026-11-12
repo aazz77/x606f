@@ -1,0 +1,59 @@
+name: build-x606f
+
+# 手动触发, 或者改动 DTS / 配置 / 工具时自动编译
+on:
+  workflow_dispatch:
+    inputs:
+      cmdline:
+        description: "追加到内核命令行的内容 (可留空)"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu flex bison bc libssl-dev \
+            libelf-dev cpio device-tree-compiler python3
+
+      - name: Configure kernel
+        run: make ARCH=arm64 defconfig x606f.config
+
+      - name: Build Image.gz and DTB
+        run: |
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j"$(nproc)" Image.gz
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- mediatek/mt6765-lenovo-tb-x606f.dtb
+
+      - name: Build initramfs (static aarch64 busybox)
+        run: tools/x606f/mk_initramfs.sh initramfs.cpio.gz
+
+      - name: Pack boot_test.img
+        env:
+          EXTRA_CMDLINE: ${{ github.event.inputs.cmdline }}
+        run: |
+          CMDLINE="bootopt=64S3,32N2,64N2 buildvariant=user earlycon=uart8250,mmio32,0x11002000 console=ttyS0,921600n8 console=tty0 ignore_loglevel keep_bootcon clk_ignore_unused pd_ignore_unused rdinit=/init $EXTRA_CMDLINE"
+          python3 tools/x606f/x606f_bootpack.py pack \
+            -o boot_test.img \
+            --kernel arch/arm64/boot/Image.gz \
+            --ramdisk initramfs.cpio.gz \
+            --dtb arch/arm64/boot/dts/mediatek/mt6765-lenovo-tb-x606f.dtb \
+            --cmdline "$CMDLINE"
+          python3 tools/x606f/x606f_bootpack.py unpack boot_test.img /tmp/unpacked | tail -20
+          mkdir -p out
+          cp boot_test.img arch/arm64/boot/Image.gz initramfs.cpio.gz .config out/
+          cp arch/arm64/boot/dts/mediatek/mt6765-lenovo-tb-x606f.dtb out/
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x606f-boot-test
+          path: out/
+          retention-days: 14
